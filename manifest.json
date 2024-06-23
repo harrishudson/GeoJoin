@@ -1,0 +1,15 @@
+{
+ "background_color": "white",
+ "description": "Geo Join - Simple Opt-In Location Sharing",
+ "display": "fullscreen",
+ "icons": [
+   {
+    "src": "favicon.svg",
+    "sizes": "24x24 36x36 48x48 72x72 96x96 128x128 192x192 256x256",
+    "type": "image/svg+xml"
+  }
+ ],
+ "name": "Geo Join",
+ "short_name": "Geo Join",
+ "start_url": "./"
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Geo Join Static Favicon.  Copyright (c)2024 Harris Hudson  harris@harrishudson.com -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 40 40" preserveAspectRatio="xMidYMid meet">
+ <circle cx="25" cy="25" r="12" fill="cyan" stroke="black" stroke-width="1"/>
+ <path d="M 0 -10 L -6 8 Q 0 2 6 8 L 0 -10 z" fill="black" stroke="none" transform="translate(25 25) rotate(33)"/>
+</svg>

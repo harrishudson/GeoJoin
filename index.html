@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <title>Geo Join - Simple Opt-In Location Sharing</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://unpkg.com/ 'unsafe-inline'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="HandheldFriendly" content="true"> 
+  <meta name="author" content="Harris Hudson. harris@harrishudson.com, https://harrishudson.com">
+  <link id="ico" rel="icon" href="favicon.svg" type="image/svg">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" 
+   integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" 
+   crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+   crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+   crossorigin=""></script>
+  <link rel="stylesheet" href="geojoin.css">
+  <script src="geojoin.js" type="module"></script>
+  <script>
+   if (location.protocol == 'http:')
+    location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
+  </script>
+ </head>
+
+<body>
+
+<div class="full_screen">
+ <div id="map" style="overflow:hidden; width:100%; height:100%;"> 
+  <div class="map_headings">
+   <span id="map_title" class="map_title shadow"></span><br>
+  </div>
+  <div class="map_buttons">
+   <button id="button_zoom_in" title="Zoom In"><i class="fa fa-plus"></i></button><br>
+   <button id="button_zoom_out" title="Zoom Out"><i class="fa fa-minus"></i></button><br>
+   <button id="button_settings" title="Settings"><i class="fa fa-cog"></i></button><br>
+   <button id="button_resume" title="Resume Tracking"><i class="fa fa-location-arrow"></i></button><br>
+  </div>
+ </div>
+
+ <dialog id="map_settings_dialog" class="map_dialog">
+  <dl>
+   <dt>User Name 
+    <span style="font-size: smaller;"><em>(you)</em></span> * 
+   </dt>
+   <dd><input type="text" 
+        id="map_user_input" placeholder="Enter your Name or Label"/></dd>
+   <dt>Map Name *</dt>
+   <dd><input type="text" 
+        id="map_name_input" placeholder="10-40 chars Unique Map Name" /></dd>
+   <dt id="dialog_url_header" style="display:none;">Map URL 
+    <span style="font-size: smaller;"><em>(share this link with your friends)</em></span>
+   </dt>
+   <dd id="dialog_url_section" style="display:none;">
+    <a id="dialog_url" href="" style="font-size:xx-small;"></a>
+    <button id="map_settings_dialog_copy" title="Copy Map URL to clipboard">
+     <i class="fa fa-clipboard"></i>
+    </button>
+   </dd>
+   <dt>Map Base Layer</dt>
+   <dd><select id="base_layer_selector"></select></dd>
+  </dl>
+  <p>
+   <button id="map_settings_dialog_go" title="Go">Go</button>
+   <button id="map_settings_dialog_close" title="Close (No Changes)">Close</button>
+   <button id="map_settings_dialog_reset" title="Reset (Start Again)">Reset</button>
+  </p>
+ </dialog>
+
+ <dialog id="about_dialog" class="map_dialog">
+  <dl class="small">
+   <dt>Geo Join - <em>Simple Opt-In Location Sharing</em></dt>
+   <dd>
+    A simple Open Source, platform independent, and friendly way to help share your geo-locations 
+    with your friends and family on an Opt-In basis per shared map.  No user account is required.  
+    Just set up a Map User Name for yourself and a Unique Map Name that you can share with your 
+    friends and family - and you are ready to go.  Don't send your sensitive geo-location information 
+    to the big players unnecessarily.  Geo Join is built with a minimalist UI but has the core essential 
+    functions to help you share you location with your friends and family.
+   </dd>
+   <dt>Technical</dt>
+   <dd>Geo Join is built so that your can serve it on your own hosting service.  If you find that your maps expire
+       too quickly (in that you receive too many "Map Request Failure"'s) using the online hosted version, then you 
+       may wish to consider hosting your own copy on your own domain.
+  <dt>Privacy</dt>
+   <dd>In addition to the standard web information for posted web data (such as; IP Address, invoked URL, 
+       Date/Time and User-Agent), Geo Join will send your; Map User Name, Unique Map Name, Latitude, Longitude, 
+       Geo Accuracy, Heading and Speed to the server.  No other information is sent to the server.  Geo Join 
+       will remove a User's Map information once that user is inactive for 90 seconds and will also remove an 
+       entire Map data (for a given Unique Map Name) once that map is inactive for more than 5 minutes.  Geo Join 
+       does not use cookies.  If you are concerned about sending this information - consider hosting your own 
+       copy of Geo Join.</dd>
+   <dt>Tip</dt>
+   <dd>In order to ensure your Map is only shared with your friends and family - it is important to make your
+       Map Name as Unique as possible.  This will minimise the likely-hood of strangers "Map Bombing" your shared
+       map.  As such, Map Names must have a minimum length of 10 characters.</dd>
+   <dt>Install</dt>  
+   <dd>Geo Join can be used as a web page or installed as a native app (Add-To-Home-Screen) on your device.
+       Note that Geo Join cannot function offline - and will require an active internet connection to 
+       work correctly.  
+       <br/>Install Now <button id="install"><i class="fa fa-star"></i></button></dd>
+   <dt>Acknowledgement</dt> 
+   <dd>Geo Join is built upon; Leaflet and Font Awesome libraries, along with; HTML5, javascript and php.</dd>
+   <dt>Version</dt>
+   <dd><span id="about_version_literal"></span></dd>
+   <dt>Donate, Support and Further Information</dt>
+   <dd>Geo Join is &copy; <a href="https://harrishudson.com">Harris Hudson</a> 2024.  
+       If you would like to reach out, help, or support this app and keep 
+       it going, you can donate to Harris here; 
+       <a href="https://harrishudson.com/#sponsor">https://harrishudson.com/#sponsor</a>.  
+       All donations go directly 
+       towards continued Open Source development.
+   </dd>
+  </dl>
+  <p>
+   <button id="about_dialog_close" title="Close">Close</button>
+  </p>
+ </dialog>
+
+ </div>
+
+ <ul id="status_queue" class="status"></ul>
+ <span id="throbber" class="loading_throbber" style="visibility:hidden;"><i class="fa fa-circle-o-notch  spin"></i></span>
+ <span id="info_throbber" class="loading_throbber" style="font-size: 16px;visibility:hidden;"></span>
+
+</body>
+</html>
