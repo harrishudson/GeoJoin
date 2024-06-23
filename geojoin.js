@@ -17,6 +17,7 @@ var gLAST_LONGITUDE = null
 var gLAST_POST_LATITUDE = null
 var gLAST_POST_LONGITUDE = null
 var gLAST_POST_DATE = null
+var gLAST_MAP_NAME = null
 var gPERMIT_POLL = true
 var gPERMIT_FEED = false
 var gFEED_POLL = 2000
@@ -83,6 +84,10 @@ function status_destroy(el) {
 }
 
 function show_about() {
+ if ((gLAST_MAP_NAME) && (gLAST_MAP_NAME != document.getElementById('map_name_input').value)) {
+  status_msg('Map Name has changed - Press "Go" or "Reset"')
+  return false
+ }
  close_all_dialogs()
  gPERMIT_FEED = false
  gPERMIT_POLL = false
@@ -121,36 +126,53 @@ function map_startup() {
  })
 
  gMAP.on('click', function() {
-  if (a_dialog_is_open())
-   post_event_track_resume()
+  if (a_dialog_is_open()) {
+   if ((gLAST_MAP_NAME) && (gLAST_MAP_NAME != document.getElementById('map_name_input').value)) {
+    status_msg('Map Name has changed - Press "Go" or "Reset"')
+    return false
+   } else
+    post_event_track_resume()
+  }
   return false
  })
 
  document.getElementById("button_zoom_in").addEventListener('click', 
   function(e) { 
+   e.stopPropagation()
+   if ((gLAST_MAP_NAME) && 
+       (gLAST_MAP_NAME != document.getElementById('map_name_input').value)) {
+    status_msg('Map Name has changed - Press "Go" or "Reset"')
+    return false
+   }
    close_all_dialogs()
    gMAP.zoomIn()
-   e.stopPropagation()
    return false
   })
 
  document.getElementById("button_zoom_out").addEventListener('click', 
   function(e) { 
+   e.stopPropagation()
+   if ((gLAST_MAP_NAME) && 
+       (gLAST_MAP_NAME != document.getElementById('map_name_input').value)) {
+    status_msg('Map Name has changed - Press "Go" or "Reset"')
+    return false
+   }
    close_all_dialogs()
    gMAP.zoomOut()
-   e.stopPropagation()
    return false
  })
 
  document.getElementById("button_settings").addEventListener('click', 
   function(e) { 
+   e.stopPropagation() 
+   if (document.getElementById('map_settings_dialog').open)
+    return false;
    close_all_dialogs()
    gPERMIT_FEED = false
    gPERMIT_POLL = false
    try { clearTimeout(gTRACKING_WARNING_TIMEOUT); } catch(e) {}
    try { clearTimeout(gTRACKING_RESUME_TIMEOUT); } catch(e) {}
-   document.getElementById('map_settings_dialog').show()
-   e.stopPropagation() 
+   show_map_settings_dialog()
    return false 
   })
 
@@ -163,8 +185,24 @@ function map_startup() {
  document.getElementById('map_settings_dialog_close').addEventListener('click', 
   function(e) { 
    e.stopPropagation()
-   document.getElementById('map_settings_dialog').close()
+   if (gLAST_MAP_NAME != document.getElementById('map_name_input').value) {
+    status_msg('Map Name has changed - Press "Go" or "Reset"')
+    return false
+   }
+   close_map_settings_dialog()
    post_event_track_resume()
+   return false
+  })
+
+ document.getElementById('random').addEventListener('click', 
+  async function(e) { 
+   e.stopPropagation()
+   status_msg('Generating Random Map Name')
+   document.getElementById('map_name_input').value = await generate_random_map_name()
+   gPERMIT_FEED = false
+   gPERMIT_POLL = false
+   save_map_name()
+   check_and_show_map_url()
    return false
   })
 
@@ -199,6 +237,11 @@ function map_startup() {
  document.getElementById('button_resume').addEventListener('click', 
   function(e) { 
    e.stopPropagation()
+   if ((gLAST_MAP_NAME) && 
+       (gLAST_MAP_NAME != document.getElementById('map_name_input').value)) {
+    status_msg('Map Name has changed - Press "Go" or "Reset"')
+    return false
+   }
    post_event_track_resume()
    return false
   })
@@ -268,7 +311,7 @@ function map_startup() {
   gPERMIT_POLL = false
   try { clearTimeout(gTRACKING_WARNING_TIMEOUT); } catch(e) {}
   try { clearTimeout(gTRACKING_RESUME_TIMEOUT); } catch(e) {}
-  document.getElementById('map_settings_dialog').show()
+  show_map_settings_dialog()
  } else
   geo_startup()
 }
@@ -315,6 +358,17 @@ function close_all_dialogs() {
  }
  gPERMIT_POLL = true
  gPERMIT_FEED = true
+ gLAST_MAP_NAME = null
+}
+
+function show_map_settings_dialog() {
+ gLAST_MAP_NAME = document.getElementById('map_name_input').value
+ document.getElementById('map_settings_dialog').show()
+}
+
+function close_map_settings_dialog() {
+ gLAST_MAP_NAME = null
+ document.getElementById('map_settings_dialog').close()
 }
 
 function populate_form() {
@@ -462,6 +516,11 @@ function submit_form() {
   return
  close_all_dialogs()
  set_map_location()
+}
+
+async function generate_random_map_name() {
+ var rname = await hashSHA256(Math.random())
+ return rname.substr(-32)
 }
 
 function geo_startup() {

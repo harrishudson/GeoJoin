@@ -1,5 +1,5 @@
 // Downloaded from; https://github.com/vanillaes/csv
-// Please refer to above link for origianl authors LICENCE information
+// Please refer to above link for original authors LICENCE information
 
 /**
  * Parse takes a string of CSV data and converts it to a 2 dimensional array
