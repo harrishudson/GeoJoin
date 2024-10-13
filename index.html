@@ -43,15 +43,17 @@
 
  <dialog id="map_settings_dialog" class="map_dialog">
   <dl>
-   <dt>User Name 
+   <dt>Map Marker Label / Handle
     <span style="font-size: smaller;"><em>(you)</em></span> * 
    </dt>
    <dd><input type="text" 
-        id="map_user_input" placeholder="Enter your Name or Label"/></dd>
+        id="map_label_input" placeholder="Enter your Map Marker Label or Handle"/>
+    <button title="Generate Random Map Marker Label" id="random_label"><i class="fa fa-random"></i></button>
+   </dd>
    <dt>Map Name * </dt>
    <dd><input type="text" 
         id="map_name_input" placeholder="10-40 chars Unique Map Name" />
-    <button title="Generate Random Map Name" id="random"><i class="fa fa-random"></i></button>
+    <button title="Generate Random Map Name" id="random_map"><i class="fa fa-random"></i></button>
    </dd>
    <dt id="dialog_url_header" style="display:none;">Map URL 
     <span style="font-size: smaller;"><em>(share this link with your friends)</em></span>
@@ -66,6 +68,9 @@
    <dd><select id="base_layer_selector"></select></dd>
   </dl>
   <p>
+   <span id="map_settings_about" class="link">About Geo Join</span>
+  </p>
+  <p>
    <button id="map_settings_dialog_go" title="Go"><i class="fa fa-caret-right"></i> Go</button>
    <button id="map_settings_dialog_close" title="Close (No Changes)">Close</button>
    <button id="map_settings_dialog_reset" title="Reset (Start Again)">Reset</button>
@@ -74,11 +79,11 @@
 
  <dialog id="about_dialog" class="map_dialog">
   <dl class="small">
-   <dt>Geo Join - <em>Simple Opt-In Location Sharing</em></dt>
+   <dt>About Geo Join - <em>Simple Opt-In Location Sharing</em></dt>
    <dd>
     A simple Open Source, platform independent, and friendly way to help share your geo-locations 
     with your friends and family on an Opt-In basis per shared map.  No user account is required.  
-    Just set up a Map User Name for yourself and a Unique Map Name that you can share with your 
+    Just set up a Map Marker Label / Handle for yourself and a unique Map Name that you can share with your 
     friends and family - and you are ready to go.  Don't send your sensitive geo-location information 
     to the big players unnecessarily.  Geo Join is built with a minimalist UI but has the core essential 
     functions to help you share you location with your friends and family.
@@ -89,17 +94,26 @@
        may wish to consider hosting your own copy on your own domain.
   <dt>Privacy</dt>
    <dd>In addition to the standard web information for posted web data (such as; IP Address, invoked URL, 
-       Date/Time and User-Agent), Geo Join will send your; Map User Name, Unique Map Name, Latitude, Longitude, 
-       Geo Accuracy, Heading and Speed to the server.  No other information is sent to the server.  Geo Join 
-       will remove a User's Map information once that user is inactive for 90 seconds and will also remove an 
-       entire Map data (for a given Unique Map Name) once that map is inactive for more than 5 minutes.  Geo Join 
-       does not use cookies.  If you are concerned about sending this information - consider hosting your own 
-       copy of Geo Join.</dd>
+       Date/Time and User-Agent), Geo Join will send your; Map Marker Label / Handle, Map Name, 
+       Latitude, Longitude, Geo Accuracy, Heading and Speed to the server.  No other information is sent to the server.  
+       Geo Join will remove from the server Map Label information along with geo-location information once that 
+       Label is inactive for 90 seconds and will also remove an entire Map data (for a given Map Name) once 
+       that map is inactive for more than 5 minutes.  
+       Geo Join does not use cookies.  Map Names must be between 10 and 40 characters in length.
+       To mitigate against "Map Bombing" by strangers, you should consider; 1) make your Map Name
+       as complex, unique, and long as possible, and 2) consider not to recycle or use/re-use a given Map Name
+       for an extended period of time (ie, you perhaps should consider to periodically change your 
+       Map Name from time to time). 
+       Note; to enhance your privacy, you should generally not have any personal identifiable information 
+       either as part of your Map Marker Label / Handle or Map Name.  If you are still concerned 
+       about sending this information - consider hosting your own copy of Geo Join. </dd>
    <dt>Tip</dt>
-   <dd>In order to ensure your Map is only shared with your friends and family - it is important to make your
-       Map Name as Unique as possible.  This will minimise the likely-hood of strangers "Map Bombing" your shared
-       map.  As such, Map Names must have a minimum length of 10 characters.  If you are not sure how to create
-       a Unique Map Name, just use the Random Name generator button to get you started with a name prefix.</dd>
+   <dd>In order to support that your Map is only being shared with your friends and family - it is important to 
+       make your Map Name as unique as possible and not use a given Map Name for an extended period of time.
+       This will minimise the likely-hood of strangers "Map Bombing" your shared map.  As such, Map Names must 
+       have a minimum length of 10 characters.  If you are not sure how to create a unique Map Name, just use 
+       the Random Name generator button to get you started with a name prefix.  There is also a Random Name
+       generator button for Map Marker Labels / Handles to ensure greater privacy.</dd>
    <dt>Install</dt>  
    <dd>Geo Join can be used as a web page or installed as a native app (Add-To-Home-Screen) on your device.
        Note that Geo Join cannot function offline - and will require an active internet connection to 
@@ -109,7 +123,9 @@
    <dd>Geo Join is built upon; Leaflet and Font Awesome libraries, along with; HTML5, javascript and php.</dd>
    <dt>Version</dt>
    <dd><span id="about_version_literal"></span></dd>
-   <dt>Donate, Support and Further Information</dt>
+   <dt>Code Repo</dt>
+   <dd><a href="https://github.com/harrishudson/GeoJoin">https://github.com/harrishudson/GeoJoin</a></dd>
+   <dt>Author, Donate, Support and Further Information</dt>
    <dd>Geo Join is &copy; <a href="https://harrishudson.com">Harris Hudson</a> 2024.  
        If you would like to reach out, help, or support this app and keep 
        it going, you can donate to Harris here; 

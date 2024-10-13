@@ -2,7 +2,7 @@ import {parse} from './csv.js'
 import {stringify} from './csv.js'
 import {distVincenty} from './vincenty.js'
 
-const gVERSION_LITERAL = 'Geo Join v1.0 June 2024'
+const gVERSION_LITERAL = 'Geo Join v1.1 October 2024'
 var gMAP
 var gMAP_MARKER_LAYER
 var gBASE_LAYER
@@ -182,6 +182,13 @@ function map_startup() {
    return false
   })
 
+ document.getElementById('map_settings_about').addEventListener('click', 
+  function(e) { 
+   e.stopPropagation()
+   show_about()
+   return false
+  })
+
  document.getElementById('map_settings_dialog_close').addEventListener('click', 
   function(e) { 
    e.stopPropagation()
@@ -194,7 +201,19 @@ function map_startup() {
    return false
   })
 
- document.getElementById('random').addEventListener('click', 
+ document.getElementById('random_label').addEventListener('click', 
+  async function(e) { 
+   e.stopPropagation()
+   status_msg('Generating Random Map Label')
+   document.getElementById('map_label_input').value = await generate_random_label_name()
+   gPERMIT_FEED = false
+   gPERMIT_POLL = false
+   save_map_label()
+   check_and_show_map_url()
+   return false
+  })
+
+ document.getElementById('random_map').addEventListener('click', 
   async function(e) { 
    e.stopPropagation()
    status_msg('Generating Random Map Name')
@@ -246,16 +265,16 @@ function map_startup() {
    return false
   })
 
- document.getElementById('map_user_input').addEventListener('input', 
+ document.getElementById('map_label_input').addEventListener('input', 
   function(e) { 
    gPERMIT_FEED = false
    gPERMIT_POLL = false
-   save_user_name()
+   save_map_label()
    check_and_show_map_url()
    return false
   })
 
- document.getElementById('map_user_input').addEventListener('keypress', 
+ document.getElementById('map_label_input').addEventListener('keypress', 
   function(e) { 
    if (e.which === 13 || e.keyCode === 13 || e.key === "Enter") {
     submit_form()
@@ -372,8 +391,8 @@ function close_map_settings_dialog() {
 }
 
 function populate_form() {
- if (localStorage['user_name'])
-  document.getElementById('map_user_input').value = localStorage['user_name']
+ if (localStorage['map_label'])
+  document.getElementById('map_label_input').value = localStorage['map_label']
  var s = window.location.search
  if (s)
   s = s.substr(1)
@@ -389,18 +408,18 @@ function populate_form() {
  set_map_base_layer()
 }
 
-function validate_user_name(quiet) {
- let map_user_name = document.getElementById('map_user_input').value
- let map_user_stripped = map_user_name.replace(/\s/g, "")
- if (!map_user_stripped) {
+function validate_map_label(quiet) {
+ let map_map_label = document.getElementById('map_label_input').value
+ let map_label_stripped = map_map_label.replace(/\s/g, "")
+ if (!map_label_stripped) {
   if (!quiet)
-   status_msg('Please enter a User Name for yourself')
+   status_msg('Please enter a Label / Handle for yourself')
   return false
  }
- let map_name_trim = map_user_name.trim()
+ let map_name_trim = map_map_label.trim()
  if (map_name_trim.length > 40) {
   if (!quiet)
-   status_msg('User Name must be 40 characters or less in length')
+   status_msg('Label / Handle must be 40 characters or less in length')
   return false
  }
  return true
@@ -424,7 +443,7 @@ function validate_map_url(quiet) {
 }
 
 function validate_input(quiet) {
- if (!validate_user_name(quiet))
+ if (!validate_map_label(quiet))
   return false
  if (!validate_map_url(quiet))
   return false
@@ -455,20 +474,20 @@ function check_and_show_map_url() {
  dialog_url.textContent = href
  map_url_header.style.display = 'block'
  map_url_section.style.display = 'block'
- save_user_name()
+ save_map_label()
  save_map_name()
  document.getElementById('map_title').textContent = map_name
 }
 
-function save_user_name() {
- if (validate_user_name(true))
-  localStorage['user_name'] = document.getElementById('map_user_input').value
+function save_map_label() {
+ if (validate_map_label(true))
+  localStorage['map_label'] = document.getElementById('map_label_input').value
  else
-  clear_user_name()
+  clear_map_label()
 }
 
-function clear_user_name() {
- localStorage['user_name'] = ''
+function clear_map_label() {
+ localStorage['map_label'] = ''
 }
 
 function save_map_name() {
@@ -505,7 +524,7 @@ function reset_map_location() {
 }
 
 function start_again() {
- clear_user_name()
+ clear_map_label()
  clear_map_name()
  localStorage['base_layer'] = ''
  reset_map_location()
@@ -516,6 +535,22 @@ function submit_form() {
   return
  close_all_dialogs()
  set_map_location()
+}
+
+async function generate_random_label_name() {
+ const adjectives = [
+  "Swift", "Fierce", "Brave", "Clever", "Mighty", "Sly", "Chill", 
+  "Radiant", "Mysterious", "Lone", "Fearless", "Wandering", "Lucky", 
+  "Silent", "Bold"
+ ];
+ const nouns = [
+  "Falcon", "Tiger", "Wolf", "Phoenix", "Shadow", "Eagle", "Lion", 
+  "Warrior", "Dragon", "Fox", "Raven", "Knight", "Hunter", "Sage", 
+  "Nomad"
+ ];
+ const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+ const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+ return `${randomAdjective}${randomNoun}${Math.floor(Math.random() * 1000)}`;
 }
 
 async function generate_random_map_name() {
@@ -563,7 +598,7 @@ function check_and_post_position(coords) {
 
  let payload = [[
   document.getElementById('map_name_input').value,
-  document.getElementById('map_user_input').value,
+  document.getElementById('map_label_input').value,
   coords.latitude,
   coords.longitude,
   coords.accuracy,
@@ -670,10 +705,10 @@ function remove_map_layer() {
 function add_map_layer(data) {
  if (!data) return
  var markers = []
- var this_user_list = []
+ var this_label_list = []
  for (let i = 0; i < data.length; i++) {
   let p = data[i]
-  this_user_list.push(p[0])
+  this_label_list.push(p[0])
   let m1 = makeMarker(
    p[0], 
    parseFloat(p[1]),
@@ -693,10 +728,10 @@ function add_map_layer(data) {
    flyToBounds(bounds)
   }
  }
- compare_users(this_user_list)
+ compare_labels(this_label_list)
 }
 
-function makeMarker(user_name, lat, lng, accuracy, speed, heading, ref_lat, ref_lng) {
+function makeMarker(map_label, lat, lng, accuracy, speed, heading, ref_lat, ref_lng) {
 
  let s = document.createElementNS("http://www.w3.org/2000/svg", "svg")
  s.setAttribute('xmlns', "http://www.w3.org/2000/svg")
@@ -727,8 +762,8 @@ function makeMarker(user_name, lat, lng, accuracy, speed, heading, ref_lat, ref_
   }
  }
  
- if (user_name) {
-  user_name = user_name.trim()
+ if (map_label) {
+  map_label = map_label.trim()
   let u = document.createElementNS("http://www.w3.org/2000/svg", "text")
   u.setAttribute('x', "45")
   u.setAttribute('y', "20") 
@@ -738,7 +773,7 @@ function makeMarker(user_name, lat, lng, accuracy, speed, heading, ref_lat, ref_
   u.setAttribute('fill', "black")
   u.setAttribute('stroke', "none")
   u.setAttribute('class', "shadow")
-  u.appendChild(document.createTextNode(user_name))
+  u.appendChild(document.createTextNode(map_label))
   s.appendChild(u)
  }
 
@@ -761,7 +796,7 @@ function makeMarker(user_name, lat, lng, accuracy, speed, heading, ref_lat, ref_
   s.appendChild(a)
  }
 
- if ((ref_lat) && (ref_lng) && (user_name != localStorage['user_name'])) {
+ if ((ref_lat) && (ref_lng) && (map_label != localStorage['map_label'])) {
   let v = distVincenty(ref_lat, ref_lng, lat, lng)
   if (v != 0) {
    let d = v.distance
@@ -831,18 +866,18 @@ function get_differences(referenceArray, newArray) {
  return { newEntries, removedEntries }
 }
 
-function compare_users(this_user_list) {
+function compare_labels(this_label_list) {
  if (gUSER_LIST.length != 0) {
   let gus = gUSER_LIST.sort()
-  let us = this_user_list.sort()
+  let us = this_label_list.sort()
   let diffs = get_differences(gus, us)
   diffs['newEntries'].forEach(u => { status_msg(`${u} Joined`) })
   diffs['removedEntries'].forEach(u => { status_msg(`${u} Left`) })
  } else {
-  let users = this_user_list.join('; ')
-  status_msg(`Connected Users: ${users}`)
+  let labels = this_label_list.join('; ')
+  status_msg(`Connected: ${labels}`)
  }
- gUSER_LIST = this_user_list
+ gUSER_LIST = this_label_list
 }
 
 function formatDistance(distance) {

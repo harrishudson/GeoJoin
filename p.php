@@ -83,10 +83,10 @@ if (sizeof($payload) <> 7) {
  exit;
 };
 
-$user_name = $payload[1];
-$user_name_trim = trim($user_name);
-$user_name_len = strlen($user_name_trim); 
-if (($user_name_len < 1) or ($user_name_len > 40)) {
+$map_label = $payload[1];
+$map_label_trim = trim($map_label);
+$map_label_len = strlen($map_label_trim); 
+if (($map_label_len < 1) or ($map_label_len > 40)) {
  echo 'fail';
  exit;
 };
@@ -124,7 +124,7 @@ if (flock($fp, LOCK_EX)) {
   $i = 0;
   $break_index = array();
   while ($i < sizeof($db_read)) {
-   if ($db_read[$i][0] == $user_name) {
+   if ($db_read[$i][0] == $map_label) {
     array_push($break_index, $i);
     break;
    };
