@@ -1,9 +1,9 @@
 body {
  font-family: Verdana, sans-serif;
- color: black; 
+ color: black;
 }
 
-input,select,textarea,pre {
+input, select, textarea, pre {
  border: 1px solid rgb(51 80 117);
  border-radius: 5px;
  margin: 1px;
@@ -20,14 +20,14 @@ dl.small {
 
 dialog {
  background-color: #efefef;
- border:1px solid rgb(51 80 117);
+ border: 1px solid rgb(51 80 117);
  border-radius: 5px;
  outline: none;
  z-index: 1200;
  position: fixed;
  top: 40px;
- max-height: calc(100dvh - 100px); 
- max-width: 80%; 
+ max-height: calc(100dvh - 100px);
+ max-width: 80%;
  overflow: auto;
 }
 
@@ -42,6 +42,7 @@ dialog button {
 a, .link {
  text-decoration: underline;
 }
+
 a:hover, .link:hover {
  cursor: pointer;
 }
@@ -71,7 +72,7 @@ ul.status {
  z-index: 9000;
 }
 
-ul.status>li {
+ul.status > li {
  color: white;
  border: 2px solid rgb(51 80 117);
  border-radius: 5px;
@@ -95,9 +96,9 @@ ul.status>li {
  align-items: center;
  z-index: 9000;
  pointer-events: none;
- font-size: 70px; 
+ font-size: 70px;
  color: rgb(51 80 117);
- background-color: rgba(255, 255, 255, 0.08); 
+ background-color: rgba(255, 255, 255, 0.08);
 }
 
 .status_right {
@@ -113,26 +114,23 @@ ul.status>li {
 }
 
 .full_screen {
- position: fixed; 
- left: 0px; 
- top: 0px; 
- width: 100dvw; 
+ position: fixed;
+ left: 0px;
+ top: 0px;
+ width: 100dvw;
  height: 100dvh;
- margin: 0px; 
- padding:0px;
+ margin: 0px;
+ padding: 0px;
  z-index: 100;
 }
 
 .spin {
  animation: spin 1.0s linear infinite;
 }
+
 @keyframes spin {
- 0% {
-  transform: rotate(0deg);
- }
- 100% {
-  transform: rotate(360deg);
- }
+ 0%   { transform: rotate(0deg); }
+ 100% { transform: rotate(360deg); }
 }
 
 .map_buttons {
@@ -156,9 +154,9 @@ ul.status>li {
  padding: 2px;
 }
 
-.borderless { 
- background: none; 
- border: none !important; 
+.borderless {
+ background: none;
+ border: none !important;
  overflow: visible;
 }
 
@@ -167,4 +165,16 @@ ul.status>li {
               0px 0px 14px rgba(255, 255, 255, 1),
               0px 0px 14px rgba(255, 255, 255, 1),
               0px 0px 14px rgba(255, 255, 255, 1);
+}
+
+/* Passphrase field hint text */
+.passphrase_hint {
+ color: rgb(80 80 80);
+ font-style: italic;
+}
+
+/* Highlight passphrase input when populated to indicate encryption is active */
+#map_passphrase_input:not(:placeholder-shown) {
+ border-color: rgb(34 139 34);
+ box-shadow: 0 0 4px rgba(34, 139, 34, 0.4);
 }

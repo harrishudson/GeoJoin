@@ -2,7 +2,7 @@ import {parse} from './csv.js'
 import {stringify} from './csv.js'
 import {distVincenty} from './vincenty.js'
 
-const gVERSION_LITERAL = 'Geo Join v1.1 October 2024'
+const gVERSION_LITERAL = 'Geo Join v1.4 March 2026'
 var gMAP
 var gMAP_MARKER_LAYER
 var gBASE_LAYER
@@ -20,9 +20,19 @@ var gLAST_POST_DATE = null
 var gLAST_MAP_NAME = null
 var gPERMIT_POLL = true
 var gPERMIT_FEED = false
-var gFEED_POLL = 2000
+var gFEED_POLL = 5000
 var gUSER_LIST = []
 var gSTATUS_REQUESTS = 0
+
+// --- Timing constants ---
+// Minimum ms between position POSTs (geolocation throttle)
+const gPOST_THROTTLE_MS = 10000   // 10 s  (was 5 s)
+// Heartbeat interval when stationary
+const gHEARTBEAT_MS     = 60000   // 60 s  (was 25 s)
+// Minimum movement (metres) before re-posting
+const gMIN_MOVE_METRES  = 20
+// Jitter fraction applied to every scheduled delay (0-30%)
+const gJITTER_FRAC      = 0.30
 
 const gTILE_PROVIDERS = 
  [
@@ -50,7 +60,63 @@ const gTILE_PROVIDERS =
   {title: 'CartoDB.Positron',
    url: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', 
    attrib: '&copy; OpenStreetMap CARTO'}
- ];
+ ]
+
+// -------------------------------------------------------
+// E2E Encryption helpers (AES-GCM via WebCrypto)
+// -------------------------------------------------------
+
+async function deriveKey(passphrase, salt) {
+ const enc = new TextEncoder()
+ const keyMaterial = await crypto.subtle.importKey(
+  'raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey'])
+ return crypto.subtle.deriveKey(
+  { name: 'PBKDF2', salt: enc.encode(salt), iterations: 100000, hash: 'SHA-256' },
+  keyMaterial,
+  { name: 'AES-GCM', length: 256 },
+  false,
+  ['encrypt', 'decrypt'])
+}
+
+async function encryptField(key, plaintext) {
+ const enc = new TextEncoder()
+ const iv = crypto.getRandomValues(new Uint8Array(12))
+ const ciphertext = await crypto.subtle.encrypt(
+  { name: 'AES-GCM', iv }, key, enc.encode(String(plaintext)))
+ // Encode iv + ciphertext as base64
+ const combined = new Uint8Array(iv.byteLength + ciphertext.byteLength)
+ combined.set(iv, 0)
+ combined.set(new Uint8Array(ciphertext), iv.byteLength)
+ return btoa(String.fromCharCode(...combined))
+}
+
+async function decryptField(key, b64) {
+ try {
+  const combined = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+  const iv = combined.slice(0, 12)
+  const ciphertext = combined.slice(12)
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext)
+  return new TextDecoder().decode(plainBuf)
+ } catch (e) {
+  return null // decryption failed (wrong key or corrupted)
+ }
+}
+
+// Derive a per-map salt from the map name so keys are map-scoped
+function mapSalt(mapName) {
+ return 'geojoin:' + mapName
+}
+
+// Return a delay of base_ms +/- up to (gJITTER_FRAC * base_ms)
+// This breaks the metronomic regularity that triggers bot detection.
+function jitter(base_ms) {
+ const offset = base_ms * gJITTER_FRAC
+ return Math.round(base_ms + (Math.random() * 2 - 1) * offset)
+}
+
+// -------------------------------------------------------
+// Throbber / status
+// -------------------------------------------------------
 
 function queue_throbber() {
  gSTATUS_REQUESTS++
@@ -89,7 +155,6 @@ function show_about() {
   return false
  }
  close_all_dialogs()
- gPERMIT_FEED = false
  gPERMIT_POLL = false
  try { clearTimeout(gTRACKING_WARNING_TIMEOUT); } catch(e) {}
  try { clearTimeout(gTRACKING_RESUME_TIMEOUT); } catch(e) {}
@@ -100,7 +165,24 @@ function show_about() {
 }
 window.show_about = show_about
 
+// -------------------------------------------------------
+// Startup cleanup ping - fire-and-forget, no-param POST
+// -------------------------------------------------------
+function ping_cleanup() {
+ fetch('p.php', {
+  method: 'POST',
+  headers: { 'Content-Type': 'text/plain' },
+  body: ''
+ }).catch(() => {})
+}
+
+// -------------------------------------------------------
+// Map startup
+// -------------------------------------------------------
 function map_startup() {
+ // Trigger server-side cleanup of old maps on startup
+ ping_cleanup()
+
  gMAP = L.map('map',{"zoomControl": false}).setView([0, 0], 1)
  gMAP.attributionControl.setPrefix('<span class="link" onclick="show_about()">About Geo Join</span>')
 
@@ -168,7 +250,6 @@ function map_startup() {
    if (document.getElementById('map_settings_dialog').open)
     return false;
    close_all_dialogs()
-   gPERMIT_FEED = false
    gPERMIT_POLL = false
    try { clearTimeout(gTRACKING_WARNING_TIMEOUT); } catch(e) {}
    try { clearTimeout(gTRACKING_RESUME_TIMEOUT); } catch(e) {}
@@ -206,7 +287,6 @@ function map_startup() {
    e.stopPropagation()
    status_msg('Generating Random Map Label')
    document.getElementById('map_label_input').value = await generate_random_label_name()
-   gPERMIT_FEED = false
    gPERMIT_POLL = false
    save_map_label()
    check_and_show_map_url()
@@ -218,7 +298,6 @@ function map_startup() {
    e.stopPropagation()
    status_msg('Generating Random Map Name')
    document.getElementById('map_name_input').value = await generate_random_map_name()
-   gPERMIT_FEED = false
    gPERMIT_POLL = false
    save_map_name()
    check_and_show_map_url()
@@ -267,7 +346,6 @@ function map_startup() {
 
  document.getElementById('map_label_input').addEventListener('input', 
   function(e) { 
-   gPERMIT_FEED = false
    gPERMIT_POLL = false
    save_map_label()
    check_and_show_map_url()
@@ -283,7 +361,6 @@ function map_startup() {
 
  document.getElementById('map_name_input').addEventListener('input', 
   function(e) { 
-   gPERMIT_FEED = false
    gPERMIT_POLL = false
    save_map_name()
    check_and_show_map_url()
@@ -292,6 +369,19 @@ function map_startup() {
 
  document.getElementById('map_name_input').addEventListener('keypress', 
   function(e) { 
+   if (e.which === 13 || e.keyCode === 13 || e.key === "Enter") {
+    submit_form()
+   }
+  })
+
+ document.getElementById('map_passphrase_input').addEventListener('input',
+  function(e) {
+   save_map_passphrase()
+   return false
+  })
+
+ document.getElementById('map_passphrase_input').addEventListener('keypress',
+  function(e) {
    if (e.which === 13 || e.keyCode === 13 || e.key === "Enter") {
     submit_form()
    }
@@ -326,7 +416,6 @@ function map_startup() {
 
  if (!validate_input()) {
   close_all_dialogs()
-  gPERMIT_FEED = false
   gPERMIT_POLL = false
   try { clearTimeout(gTRACKING_WARNING_TIMEOUT); } catch(e) {}
   try { clearTimeout(gTRACKING_RESUME_TIMEOUT); } catch(e) {}
@@ -376,7 +465,6 @@ function close_all_dialogs() {
   dialogs[d].close()
  }
  gPERMIT_POLL = true
- gPERMIT_FEED = true
  gLAST_MAP_NAME = null
 }
 
@@ -393,6 +481,10 @@ function close_map_settings_dialog() {
 function populate_form() {
  if (localStorage['map_label'])
   document.getElementById('map_label_input').value = localStorage['map_label']
+ // Restore passphrase from localStorage (persists across sessions, consistent
+ // with map name storage - prevents silent fallback to unencrypted mode on reopen)
+ if (localStorage['map_passphrase'])
+  document.getElementById('map_passphrase_input').value = localStorage['map_passphrase']
  var s = window.location.search
  if (s)
   s = s.substr(1)
@@ -450,6 +542,10 @@ function validate_input(quiet) {
  return true
 }
 
+function get_passphrase() {
+ return (document.getElementById('map_passphrase_input').value || '').trim()
+}
+
 function check_and_show_map_url() {
  let is_valid = validate_input(true)
  let map_url_header = document.getElementById('dialog_url_header')
@@ -501,6 +597,14 @@ function clear_map_name() {
  localStorage['map_name'] = ''
 }
 
+function save_map_passphrase() {
+ let passphrase = get_passphrase()
+ if (passphrase)
+  localStorage['map_passphrase'] = passphrase
+ else
+  localStorage.removeItem('map_passphrase')
+}
+
 function set_map_location() {
  if (!validate_map_url(true))
   return
@@ -527,6 +631,7 @@ function start_again() {
  clear_map_label()
  clear_map_name()
  localStorage['base_layer'] = ''
+ localStorage.removeItem('map_passphrase')
  reset_map_location()
 }
 
@@ -542,15 +647,15 @@ async function generate_random_label_name() {
   "Swift", "Fierce", "Brave", "Clever", "Mighty", "Sly", "Chill", 
   "Radiant", "Mysterious", "Lone", "Fearless", "Wandering", "Lucky", 
   "Silent", "Bold"
- ];
+ ]
  const nouns = [
   "Falcon", "Tiger", "Wolf", "Phoenix", "Shadow", "Eagle", "Lion", 
   "Warrior", "Dragon", "Fox", "Raven", "Knight", "Hunter", "Sage", 
   "Nomad"
- ];
- const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
- const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
- return `${randomAdjective}${randomNoun}${Math.floor(Math.random() * 1000)}`;
+ ]
+ const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)]
+ const randomNoun = nouns[Math.floor(Math.random() * nouns.length)]
+ return `${randomAdjective}${randomNoun}${Math.floor(Math.random() * 1000)}`
 }
 
 async function generate_random_map_name() {
@@ -562,8 +667,8 @@ function geo_startup() {
  gPERMIT_POLL = true
  gGEO = navigator.geolocation.watchPosition(
   geoupdate, geofailure, { enableHighAccuracy: true })
- setInterval(geo_heartbeat, 20000)
- setTimeout(fetch_map, gFEED_POLL)
+ setInterval(geo_heartbeat, gHEARTBEAT_MS)
+ setTimeout(fetch_map, jitter(gFEED_POLL))
 }
  
 function geoupdate(e) {
@@ -571,7 +676,7 @@ function geoupdate(e) {
  gLAST_LONGITUDE = e.coords.longitude
  if (gGEOLOCATION_THROTTLE) return
  gGEOLOCATION_THROTTLE = true
- setTimeout(function(){ gGEOLOCATION_THROTTLE = false },2000)
+ setTimeout(function(){ gGEOLOCATION_THROTTLE = false }, gPOST_THROTTLE_MS)
  let coords = {}
  coords.latitude = e.coords.latitude
  coords.longitude = e.coords.longitude
@@ -584,11 +689,13 @@ function geoupdate(e) {
 function check_and_post_position(coords) {
  if (!gPERMIT_POLL)
   return
+ if (!isFinite(coords.latitude) || !isFinite(coords.longitude))
+  return
  if ((gLAST_POST_LATITUDE) && (gLAST_POST_LONGITUDE)) {
   let v = distVincenty(gLAST_POST_LATITUDE, gLAST_POST_LONGITUDE, coords.latitude, coords.longitude)
   if (v != 0) {
-   let d = v.distnce
-   if (d < 20) return
+   let d = v.distance
+   if (d < gMIN_MOVE_METRES) return
   }
  }
 
@@ -596,16 +703,50 @@ function check_and_post_position(coords) {
  gLAST_POST_LONGITUDE = coords.longitude
  gLAST_POST_DATE = new Date()
 
- let payload = [[
-  document.getElementById('map_name_input').value,
-  document.getElementById('map_label_input').value,
-  coords.latitude,
-  coords.longitude,
-  coords.accuracy,
-  coords.speed,
-  coords.heading]]
+ post_position(coords)
+}
 
- let payload_stringified = stringify(payload)
+async function post_position(coords) {
+ let map_name = document.getElementById('map_name_input').value
+ let map_label = document.getElementById('map_label_input').value
+ let passphrase = get_passphrase()
+
+ let payload_stringified
+
+ if (passphrase) {
+  try {
+   let salt = mapSalt(map_name)
+   let key = await deriveKey(passphrase, salt)
+   // Label stays plaintext - needed by server for deduplication.
+   // Only the geo fields (lat, lon, accuracy, speed, heading) are encrypted.
+   let enc_lat     = await encryptField(key, coords.latitude)
+   let enc_lon     = await encryptField(key, coords.longitude)
+   let enc_acc     = await encryptField(key, coords.accuracy)
+   let enc_speed   = await encryptField(key, coords.speed)
+   let enc_heading = await encryptField(key, coords.heading)
+   let payload = [[
+    map_name,
+    map_label, enc_lat, enc_lon, enc_acc, enc_speed, enc_heading,
+    'enc'
+   ]]
+   payload_stringified = stringify(payload)
+  } catch(e) {
+   console.error('Encryption error:', e)
+   status_msg('Encryption error - check passphrase')
+   return
+  }
+ } else {
+  let payload = [[
+   map_name,
+   map_label,
+   coords.latitude,
+   coords.longitude,
+   coords.accuracy,
+   coords.speed,
+   coords.heading
+  ]]
+  payload_stringified = stringify(payload)
+ }
 
  fetch('p.php', {
   method: 'POST',
@@ -613,14 +754,14 @@ function check_and_post_position(coords) {
   body: payload_stringified
   })
   .then(response => response.text())
-  .then(data => { 
+  .then(data => {
    if (data != 'ok') {
-    status_msg('Map Request Failure') 
+    status_msg('Map Request Failure')
     gPERMIT_FEED = false
    } else
     gPERMIT_FEED = true
   })
-  .catch((error) => { console.error('Map Request Error:', error); })
+  .catch((error) => { console.error('Map Request Error:', error) })
 }
 
 function geofailure(e) {
@@ -633,7 +774,7 @@ function geo_heartbeat() {
  let now = new Date()
  if (!gLAST_POST_DATE)
   return
- if (now - gLAST_POST_DATE < 20000)
+ if (now - gLAST_POST_DATE < gHEARTBEAT_MS)
   return
  if ((!gLAST_POST_LATITUDE) || (!gLAST_POST_LONGITUDE))
   return
@@ -643,7 +784,7 @@ function geo_heartbeat() {
  coords.accuracy = ''
  coords.speed = ''
  coords.heading = ''
- check_and_post_position(coords) 
+ post_position(coords)
 }
 
 async function hashSHA256(input) {
@@ -662,40 +803,74 @@ async function encode_map_name(map_name) {
  
 async function fetch_map() {
  if (!gPERMIT_FEED) {
-  setTimeout(fetch_map, gFEED_POLL)
+  setTimeout(fetch_map, jitter(gFEED_POLL))
   return
  }
  var map_name = document.getElementById('map_name_input').value
- let map_url = await encode_map_name(map_name) 
- //queue_throbber()
+ let map_url = await encode_map_name(map_name)
  fetch(map_url, {
   method: 'GET',
   headers: { 'Content-Type': 'text/plain' }
   })
   .then(response => response.text())
-  .then(data => { 
-   //dequeue_throbber()
+  .then(async data => {
    if (data) {
-    render_map_layer(data)
-    gFEED_POLL = 2000
+    await render_map_layer(data)
+    if (gFEED_POLL > 5000)
+     gFEED_POLL = 5000
    }
-   setTimeout(fetch_map, gFEED_POLL)
+   setTimeout(fetch_map, jitter(gFEED_POLL))
   })
-  .catch((error) => { 
-   //dequeue_throbber()
+  .catch((error) => {
    console.log(error)
    status_msg('Map Request Failure.')
    remove_map_layer()
    if (gFEED_POLL < 60000)
-    gFEED_POLL*= 2
-   setTimeout(fetch_map, gFEED_POLL)
+    gFEED_POLL *= 2
+   setTimeout(fetch_map, jitter(gFEED_POLL))
   })
 }
 
-function render_map_layer(data) {
+async function render_map_layer(data) {
  let data_parsed = parse(data)
- remove_map_layer()
- add_map_layer(data_parsed)
+ let passphrase = get_passphrase()
+ let map_name = document.getElementById('map_name_input').value
+
+ if (passphrase && data_parsed.length > 0) {
+  // Decrypt rows that are encrypted
+  try {
+   let salt = mapSalt(map_name)
+   let key = await deriveKey(passphrase, salt)
+   let decrypted = []
+   for (let row of data_parsed) {
+    // All stored rows have 8 fields: [..., timestamp, mode]
+    // where mode is 'enc' or 'plain'
+    if (row.length >= 8 && row[7] === 'enc') {
+     let label   = row[0]  // plaintext - no decryption needed
+     let lat     = await decryptField(key, row[1])
+     let lon     = await decryptField(key, row[2])
+     let acc     = await decryptField(key, row[3])
+     let speed   = await decryptField(key, row[4])
+     let heading = await decryptField(key, row[5])
+     if (lat !== null && lon !== null) {
+      decrypted.push([label, lat, lon, acc, speed, heading])
+     }
+     // If decryption fails (null), skip row (wrong passphrase)
+    } else if (row.length >= 8 && row[7] === 'plain') {
+     // Plain row on an encrypted map - show as-is
+     decrypted.push([row[0], row[1], row[2], row[3], row[4], row[5]])
+    }
+   }
+   remove_map_layer()
+   add_map_layer(decrypted)
+  } catch(e) {
+   console.error('Decryption error:', e)
+   status_msg('Decryption error - check passphrase')
+  }
+ } else {
+  remove_map_layer()
+  add_map_layer(data_parsed)
+ }
 }
 
 function remove_map_layer() {
@@ -708,19 +883,22 @@ function add_map_layer(data) {
  var this_label_list = []
  for (let i = 0; i < data.length; i++) {
   let p = data[i]
+  let lat = parseFloat(p[1])
+  let lng = parseFloat(p[2])
+  if (!isFinite(lat) || !isFinite(lng)) continue
   this_label_list.push(p[0])
   let m1 = makeMarker(
-   p[0], 
-   parseFloat(p[1]),
-   parseFloat(p[2]),
+   p[0],
+   lat,
+   lng,
    p[3],
    p[4],
    p[5],
    gLAST_LATITUDE,
-   gLAST_LONGITUDE) 
+   gLAST_LONGITUDE)
   markers.push(m1)
  }
- gMAP_MARKER_LAYER =  L.featureGroup(markers)
+ gMAP_MARKER_LAYER = L.featureGroup(markers)
  gMAP_MARKER_LAYER.addTo(gMAP)
  if (gIS_TRACKING) {
   if (gMAP_MARKER_LAYER) {
@@ -756,7 +934,6 @@ function makeMarker(map_label, lat, lng, accuracy, speed, heading, ref_lat, ref_
    b.setAttribute('d', "M 0 -10 L -6 8 Q 0 2 6 8 L 0 -10 z")
    b.setAttribute('fill', "black")
    b.setAttribute('stroke', "none")
-   //b.setAttribute('stroke-width', "2")
    b.setAttribute('transform',`translate(25 25) rotate(${heading})`)
    s.appendChild(b)
   }
@@ -782,7 +959,7 @@ function makeMarker(map_label, lat, lng, accuracy, speed, heading, ref_lat, ref_
   let a = document.createElementNS("http://www.w3.org/2000/svg", "text")
   a.setAttribute('x', "45")
   a.setAttribute('y', vert_offset) 
-  vert_offset+= 18 
+  vert_offset += 18 
   a.setAttribute('font', "Verdana, sans-serif")
   a.setAttribute('font-size', "16")
   a.setAttribute('font-weight', "bolder")
@@ -817,14 +994,11 @@ function makeMarker(map_label, lat, lng, accuracy, speed, heading, ref_lat, ref_
  }
 
  let latlng = [lat, lng]
-
- let  i = new L.divIcon({html: s, 
-                         iconSize: new L.Point(40, 40), 
-                         iconAnchor: new L.Point(20, 20), 
-                         className: "borderless"})
-
+ let i = new L.divIcon({html: s, 
+                        iconSize: new L.Point(40, 40), 
+                        iconAnchor: new L.Point(20, 20), 
+                        className: "borderless"})
  let m = new L.marker(latlng, {icon: i})
-
  return m
 }
 
@@ -839,7 +1013,6 @@ function track_warning() {
 
 function post_event_track_resume() {
  close_all_dialogs()
- gPERMIT_FEED = true
  gPERMIT_POLL = true
  var bounds = null
  if (gMAP_MARKER_LAYER)
@@ -916,26 +1089,24 @@ let wakeLock = null
 const requestWakeLock = async () => {
  try {
   wakeLock = await navigator.wakeLock.request()
-  wakeLock.addEventListener('release', () => {
-  })
- } catch (err) {
- }
+  wakeLock.addEventListener('release', () => {})
+ } catch (err) {}
 }
  
 document.addEventListener('visibilitychange', async () => {
  if (wakeLock !== null && document.visibilityState === 'visible') {
   requestWakeLock()
-  }
- })
+ }
+})
  
 requestWakeLock()
 
 let gDEFERRED_INSTALL_PROMPT
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault()
-  gDEFERRED_INSTALL_PROMPT = e
- })
+ e.preventDefault()
+ gDEFERRED_INSTALL_PROMPT = e
+})
 
 function add_to_home_screen() {
  if (!gDEFERRED_INSTALL_PROMPT) {
@@ -944,8 +1115,7 @@ function add_to_home_screen() {
  }
  gDEFERRED_INSTALL_PROMPT.prompt()
  gDEFERRED_INSTALL_PROMPT.userChoice.then((choiceResult) => {
-  if (choiceResult.outcome === 'accepted') {
-  } 
+  if (choiceResult.outcome === 'accepted') {}
  })
  gDEFERRED_INSTALL_PROMPT = null
 }

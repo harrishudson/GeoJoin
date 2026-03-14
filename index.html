@@ -3,14 +3,14 @@
  <head>
   <meta charset="UTF-8">
   <title>Geo Join - Simple Opt-In Location Sharing</title>
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://unpkg.com/ 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://unpkg.com/ https://cdn.jsdelivr.net/ 'unsafe-inline'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="HandheldFriendly" content="true"> 
+  <meta name="HandheldFriendly" content="true">
   <meta name="author" content="Harris Hudson. harris@harrishudson.com, https://harrishudson.com">
-  <link id="ico" rel="icon" href="favicon.svg" type="image/svg">
+  <link id="ico" rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" 
-   integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css"
+   integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN"
    crossorigin="anonymous">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -21,129 +21,165 @@
   <link rel="stylesheet" href="geojoin.css">
   <script src="geojoin.js" type="module"></script>
   <script>
-   if (location.protocol == 'http:')
+   if (location.protocol === 'http:')
     location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
   </script>
  </head>
 
-<body>
+ <body>
 
-<div class="full_screen">
- <div id="map" style="overflow:hidden; width:100%; height:100%;"> 
-  <div class="map_headings">
-   <span id="map_title" class="map_title shadow"></span><br>
+  <div class="full_screen">
+   <div id="map" style="overflow:hidden; width:100%; height:100%;">
+    <div class="map_headings">
+     <span id="map_title" class="map_title shadow"></span>
+    </div>
+    <div class="map_buttons">
+     <button id="button_zoom_in" title="Zoom In"><i class="fa fa-plus" aria-hidden="true"></i></button><br>
+     <button id="button_zoom_out" title="Zoom Out"><i class="fa fa-minus" aria-hidden="true"></i></button><br>
+     <button id="button_settings" title="Settings"><i class="fa fa-cog" aria-hidden="true"></i></button><br>
+     <button id="button_resume" title="Resume Tracking"><i class="fa fa-location-arrow" aria-hidden="true"></i></button><br>
+    </div>
+   </div>
+
+   <dialog id="map_settings_dialog" class="map_dialog">
+    <dl>
+     <dt>Map Marker Label / Handle
+      <span style="font-size: smaller;"><em>(you)</em></span> *
+     </dt>
+     <dd>
+      <input type="text"
+       id="map_label_input"
+       placeholder="Enter your Map Marker Label or Handle"
+       maxlength="40"
+       autocomplete="off">
+      <button type="button" title="Generate Random Map Marker Label" id="random_label">
+       <i class="fa fa-random" aria-hidden="true"></i>
+      </button>
+     </dd>
+     <dt>Map Name *</dt>
+     <dd>
+      <input type="text"
+       id="map_name_input"
+       placeholder="10-40 chars Unique Map Name"
+       maxlength="40"
+       autocomplete="off">
+      <button type="button" title="Generate Random Map Name" id="random_map">
+       <i class="fa fa-random" aria-hidden="true"></i>
+      </button>
+     </dd>
+     <dt id="dialog_url_header" style="display:none;">Map URL
+      <span style="font-size: smaller;"><em>(share this link with your friends)</em></span>
+     </dt>
+     <dd id="dialog_url_section" style="display:none;">
+      <a id="dialog_url" href="" style="font-size:xx-small;"></a>
+      <button type="button" id="map_settings_dialog_copy" title="Copy Map URL to clipboard">
+       <i class="fa fa-clipboard" aria-hidden="true"></i>
+      </button>
+     </dd>
+     <dt>
+      Passphrase
+      <span style="font-size: smaller;"><em>(optional &mdash; enable end-to-end encryption)</em></span>
+     </dt>
+     <dd>
+      <input type="password"
+       id="map_passphrase_input"
+       placeholder="Optional E2E passphrase"
+       maxlength="128"
+       autocomplete="off">
+      <span class="passphrase_hint" style="font-size:smaller; display:block; margin-top:4px;">
+       All participants must use the same passphrase to see each other&#39;s locations.
+       Leave blank for unencrypted mode.
+      </span>
+     </dd>
+     <dt>Map Base Layer</dt>
+     <dd><select id="base_layer_selector"></select></dd>
+    </dl>
+    <p>
+     <span id="map_settings_about" class="link">About Geo Join</span>
+    </p>
+    <p>
+     <button type="button" id="map_settings_dialog_go" title="Go"><i class="fa fa-caret-right" aria-hidden="true"></i> Go</button>
+     <button type="button" id="map_settings_dialog_close" title="Close (No Changes)">Close</button>
+     <button type="button" id="map_settings_dialog_reset" title="Reset (Start Again)">Reset</button>
+    </p>
+   </dialog>
+
+   <dialog id="about_dialog" class="map_dialog">
+    <dl class="small">
+     <dt>About Geo Join &mdash; <em>Simple Opt-In Location Sharing</em></dt>
+     <dd>
+      A simple Open Source, platform independent, and friendly way to help share your geo-locations
+      with your friends and family on an Opt-In basis per shared map. No user account is required.
+      Just set up a Map Marker Label / Handle for yourself and a unique Map Name that you can share with your
+      friends and family &mdash; and you are ready to go. Don&#39;t send your sensitive geo-location information
+      to the big players unnecessarily. Geo Join is built with a minimalist UI but has the core essential
+      functions to help you share your location with your friends and family.
+     </dd>
+     <dt>Technical</dt>
+     <dd>Geo Join is built so that you can serve it on your own hosting service. If you find that your maps expire
+      too quickly (in that you receive too many &ldquo;Map Request Failure&rdquo;s) using the online hosted version, then you
+      may wish to consider hosting your own copy on your own domain.</dd>
+     <dt>End-to-End Encryption</dt>
+     <dd>Geo Join supports optional end-to-end encryption. In the Settings dialog, enter an optional
+      shared passphrase. If provided, your geo-location data (coordinates, accuracy, speed and heading)
+      will be encrypted in your browser using AES-256-GCM before being sent to the server. Your Map Marker
+      Label / Handle is not encrypted as it is required by the server for map management. The server only
+      ever stores the encrypted ciphertext for your location data and cannot read your coordinates. All participants
+      on the same map must use the <strong>same passphrase</strong> to see each other&#39;s locations. Leave
+      the passphrase blank for standard unencrypted operation.
+     </dd>
+     <dt>Privacy</dt>
+     <dd>In addition to the standard web information for posted web data (such as; IP Address, invoked URL,
+      Date/Time and User-Agent), Geo Join will send your; Map Marker Label / Handle, Map Name,
+      Latitude, Longitude, Geo Accuracy, Heading and Speed to the server. No other information is sent to the server.
+      Geo Join will remove from the server Map Label information along with geo-location information once that
+      Label is inactive for 90 seconds and will also remove an entire Map data (for a given Map Name) once
+      that map is inactive for more than 30 minutes.
+      Geo Join does not use cookies. Map Names must be between 10 and 40 characters in length.
+      To mitigate against &ldquo;Map Bombing&rdquo; by strangers, you should consider; 1) make your Map Name
+      as complex, unique, and long as possible, and 2) consider not to recycle or use/re-use a given Map Name
+      for an extended period of time (i.e. you perhaps should consider to periodically change your
+      Map Name from time to time).
+      Note: to enhance your privacy, you should generally not have any personal identifiable information
+      either as part of your Map Marker Label / Handle or Map Name. If you are concerned about the privacy
+      of your location data in transit or at rest on the server, consider enabling the built-in
+      end-to-end encryption by setting a shared passphrase &mdash; or consider hosting your own copy of Geo Join.</dd>
+     <dt>Tip</dt>
+     <dd>In order to support that your Map is only being shared with your friends and family &mdash; it is important to
+      make your Map Name as unique as possible and not use a given Map Name for an extended period of time.
+      This will minimise the likelihood of strangers &ldquo;Map Bombing&rdquo; your shared map. As such, Map Names must
+      have a minimum length of 10 characters. If you are not sure how to create a unique Map Name, just use
+      the Random Name generator button to get you started with a name prefix. There is also a Random Name
+      generator button for Map Marker Labels / Handles to ensure greater privacy.</dd>
+     <dt>Install</dt>
+     <dd>Geo Join can be used as a web page or installed as a native app (Add-To-Home-Screen) on your device.
+      Note that Geo Join cannot function offline &mdash; and will require an active internet connection to
+      work correctly.
+      <br>Install Now <button type="button" id="install"><i class="fa fa-star" aria-hidden="true"></i></button></dd>
+     <dt>Acknowledgement</dt>
+     <dd>Geo Join is built upon; Leaflet and Font Awesome libraries, along with; HTML5, JavaScript and PHP.</dd>
+     <dt>Version</dt>
+     <dd><span id="about_version_literal"></span></dd>
+     <dt>Code Repo</dt>
+     <dd><a href="https://github.com/harrishudson/GeoJoin">https://github.com/harrishudson/GeoJoin</a></dd>
+     <dt>Author, Donate, Support and Further Information</dt>
+     <dd>Geo Join is &copy; <a href="https://harrishudson.com">Harris Hudson</a> 2024&ndash;2026.
+      If you would like to reach out, help, or support this app and keep
+      it going, you can donate to Harris here;
+      <a href="https://harrishudson.com/#sponsor">https://harrishudson.com/#sponsor</a>.
+      All donations go directly towards continued Open Source development.
+     </dd>
+    </dl>
+    <p>
+     <button type="button" id="about_dialog_close" title="Close">Close</button>
+    </p>
+   </dialog>
+
   </div>
-  <div class="map_buttons">
-   <button id="button_zoom_in" title="Zoom In"><i class="fa fa-plus"></i></button><br>
-   <button id="button_zoom_out" title="Zoom Out"><i class="fa fa-minus"></i></button><br>
-   <button id="button_settings" title="Settings"><i class="fa fa-cog"></i></button><br>
-   <button id="button_resume" title="Resume Tracking"><i class="fa fa-location-arrow"></i></button><br>
-  </div>
- </div>
 
- <dialog id="map_settings_dialog" class="map_dialog">
-  <dl>
-   <dt>Map Marker Label / Handle
-    <span style="font-size: smaller;"><em>(you)</em></span> * 
-   </dt>
-   <dd><input type="text" 
-        id="map_label_input" placeholder="Enter your Map Marker Label or Handle"/>
-    <button title="Generate Random Map Marker Label" id="random_label"><i class="fa fa-random"></i></button>
-   </dd>
-   <dt>Map Name * </dt>
-   <dd><input type="text" 
-        id="map_name_input" placeholder="10-40 chars Unique Map Name" />
-    <button title="Generate Random Map Name" id="random_map"><i class="fa fa-random"></i></button>
-   </dd>
-   <dt id="dialog_url_header" style="display:none;">Map URL 
-    <span style="font-size: smaller;"><em>(share this link with your friends)</em></span>
-   </dt>
-   <dd id="dialog_url_section" style="display:none;">
-    <a id="dialog_url" href="" style="font-size:xx-small;"></a>
-    <button id="map_settings_dialog_copy" title="Copy Map URL to clipboard">
-     <i class="fa fa-clipboard"></i>
-    </button>
-   </dd>
-   <dt>Map Base Layer</dt>
-   <dd><select id="base_layer_selector"></select></dd>
-  </dl>
-  <p>
-   <span id="map_settings_about" class="link">About Geo Join</span>
-  </p>
-  <p>
-   <button id="map_settings_dialog_go" title="Go"><i class="fa fa-caret-right"></i> Go</button>
-   <button id="map_settings_dialog_close" title="Close (No Changes)">Close</button>
-   <button id="map_settings_dialog_reset" title="Reset (Start Again)">Reset</button>
-  </p>
- </dialog>
+  <ul id="status_queue" class="status"></ul>
+  <span id="throbber" class="loading_throbber" style="visibility:hidden;"><i class="fa fa-circle-o-notch spin" aria-hidden="true"></i></span>
+  <span id="info_throbber" class="loading_throbber" style="font-size: 16px; visibility:hidden;"></span>
 
- <dialog id="about_dialog" class="map_dialog">
-  <dl class="small">
-   <dt>About Geo Join - <em>Simple Opt-In Location Sharing</em></dt>
-   <dd>
-    A simple Open Source, platform independent, and friendly way to help share your geo-locations 
-    with your friends and family on an Opt-In basis per shared map.  No user account is required.  
-    Just set up a Map Marker Label / Handle for yourself and a unique Map Name that you can share with your 
-    friends and family - and you are ready to go.  Don't send your sensitive geo-location information 
-    to the big players unnecessarily.  Geo Join is built with a minimalist UI but has the core essential 
-    functions to help you share you location with your friends and family.
-   </dd>
-   <dt>Technical</dt>
-   <dd>Geo Join is built so that your can serve it on your own hosting service.  If you find that your maps expire
-       too quickly (in that you receive too many "Map Request Failure"'s) using the online hosted version, then you 
-       may wish to consider hosting your own copy on your own domain.
-  <dt>Privacy</dt>
-   <dd>In addition to the standard web information for posted web data (such as; IP Address, invoked URL, 
-       Date/Time and User-Agent), Geo Join will send your; Map Marker Label / Handle, Map Name, 
-       Latitude, Longitude, Geo Accuracy, Heading and Speed to the server.  No other information is sent to the server.  
-       Geo Join will remove from the server Map Label information along with geo-location information once that 
-       Label is inactive for 90 seconds and will also remove an entire Map data (for a given Map Name) once 
-       that map is inactive for more than 5 minutes.  
-       Geo Join does not use cookies.  Map Names must be between 10 and 40 characters in length.
-       To mitigate against "Map Bombing" by strangers, you should consider; 1) make your Map Name
-       as complex, unique, and long as possible, and 2) consider not to recycle or use/re-use a given Map Name
-       for an extended period of time (ie, you perhaps should consider to periodically change your 
-       Map Name from time to time). 
-       Note; to enhance your privacy, you should generally not have any personal identifiable information 
-       either as part of your Map Marker Label / Handle or Map Name.  If you are still concerned 
-       about sending this information - consider hosting your own copy of Geo Join. </dd>
-   <dt>Tip</dt>
-   <dd>In order to support that your Map is only being shared with your friends and family - it is important to 
-       make your Map Name as unique as possible and not use a given Map Name for an extended period of time.
-       This will minimise the likely-hood of strangers "Map Bombing" your shared map.  As such, Map Names must 
-       have a minimum length of 10 characters.  If you are not sure how to create a unique Map Name, just use 
-       the Random Name generator button to get you started with a name prefix.  There is also a Random Name
-       generator button for Map Marker Labels / Handles to ensure greater privacy.</dd>
-   <dt>Install</dt>  
-   <dd>Geo Join can be used as a web page or installed as a native app (Add-To-Home-Screen) on your device.
-       Note that Geo Join cannot function offline - and will require an active internet connection to 
-       work correctly.  
-       <br/>Install Now <button id="install"><i class="fa fa-star"></i></button></dd>
-   <dt>Acknowledgement</dt> 
-   <dd>Geo Join is built upon; Leaflet and Font Awesome libraries, along with; HTML5, javascript and php.</dd>
-   <dt>Version</dt>
-   <dd><span id="about_version_literal"></span></dd>
-   <dt>Code Repo</dt>
-   <dd><a href="https://github.com/harrishudson/GeoJoin">https://github.com/harrishudson/GeoJoin</a></dd>
-   <dt>Author, Donate, Support and Further Information</dt>
-   <dd>Geo Join is &copy; <a href="https://harrishudson.com">Harris Hudson</a> 2024.  
-       If you would like to reach out, help, or support this app and keep 
-       it going, you can donate to Harris here; 
-       <a href="https://harrishudson.com/#sponsor">https://harrishudson.com/#sponsor</a>.  
-       All donations go directly 
-       towards continued Open Source development.
-   </dd>
-  </dl>
-  <p>
-   <button id="about_dialog_close" title="Close">Close</button>
-  </p>
- </dialog>
-
- </div>
-
- <ul id="status_queue" class="status"></ul>
- <span id="throbber" class="loading_throbber" style="visibility:hidden;"><i class="fa fa-circle-o-notch  spin"></i></span>
- <span id="info_throbber" class="loading_throbber" style="font-size: 16px;visibility:hidden;"></span>
-
-</body>
+ </body>
 </html>
